@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  catalog_db:
+    image: postgres:15
+    container_name: catalog_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: catalog_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  catalogservice:
+    build: ./src/CatalogService/CatalogService
+    container_name: catalogservice
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      catalog_db:
+        condition: service_healthy
+    ports:
+      - "5001:80"
+    environment:
+      ConnectionStrings__Postgres: "Host=catalog_db;Port=5432;Database=catalog_db;Username=postgres;Password=yourpassword"
+      RabbitMQ__Host: "rabbitmq"
+      RabbitMQ__Username: "guest"
+      RabbitMQ__Password: "guest"
+    entrypoint: >
+      sh -c "./wait-for-it.sh catalog_db:5432 -- ./wait-for-it.sh rabbitmq:5672 -- dotnet CatalogService.dll"
+    
+    working_dir: /app
+
+volumes:
+  pgdata:
