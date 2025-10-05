@@ -50,8 +50,19 @@ services:
       RabbitMQ__Password: "guest"
     entrypoint: >
       sh -c "./wait-for-it.sh catalog_db:5432 -- ./wait-for-it.sh rabbitmq:5672 -- dotnet CatalogService.dll"
-    
     working_dir: /app
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=30  # check every 30 seconds
+    command: --cleanup
+    # Optionally, watch only the catalogservice container:
+    # command: catalogservice --cleanup
 
 volumes:
   pgdata:
